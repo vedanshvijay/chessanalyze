@@ -13,15 +13,21 @@ pygame.init()
 WINDOW_SIZE = 800
 BOARD_SIZE = 8
 SQUARE_SIZE = WINDOW_SIZE // BOARD_SIZE
-WHITE = (255, 255, 255)
-BLACK = (128, 128, 128)
-HIGHLIGHT = (124, 252, 0, 128)
-MOVE_HIGHLIGHT = (0, 255, 0, 128)
-CHECK_HIGHLIGHT = (255, 0, 0, 128)
-BEST_MOVE_HIGHLIGHT = (0, 191, 255, 128)  # Deep Sky Blue
-INPUT_BOX_HEIGHT = 60
-INFO_HEIGHT = 120  # Increased height for more info
+WHITE = (240, 240, 240)  # Lighter white
+BLACK = (75, 115, 153)   # Nice blue-gray
+HIGHLIGHT = (124, 252, 0, 180)  # Brighter green
+MOVE_HIGHLIGHT = (0, 255, 0, 180)  # Brighter move highlight
+CHECK_HIGHLIGHT = (255, 50, 50, 180)  # Brighter red
+BEST_MOVE_HIGHLIGHT = (30, 144, 255, 180)  # Brighter blue
+INPUT_BOX_HEIGHT = 80  # Taller input box
+INFO_HEIGHT = 160  # More space for info
 TOTAL_HEIGHT = WINDOW_SIZE + INPUT_BOX_HEIGHT + INFO_HEIGHT
+
+# Colors for UI
+LIGHT_BLUE = (200, 220, 255)
+DARK_BLUE = (100, 150, 200)
+GOLD = (255, 215, 0)
+SILVER = (192, 192, 192)
 
 # Piece values
 PIECE_VALUES = {
@@ -52,10 +58,12 @@ class ChessBoard:
         self.evaluation = None
         self.initialize_engine()
         self.moves_made = 0
-        self.max_moves = 6
+        self.max_moves = 12  # Increased to 12 moves
         self.white_score = 0
         self.black_score = 0
         self.last_capture = None
+        self.game_over = False
+        self.winner = None
     
     def initialize_engine(self):
         try:
@@ -113,30 +121,45 @@ class ChessBoard:
         moves = []
         for move in self.board.legal_moves:
             if move.from_square == square:
-                # Only allow capturing moves
-                if self.board.is_capture(move):
-                    moves.append(move.to_square)
+                # Allow both capturing and non-capturing moves
+                moves.append(move.to_square)
         return moves
     
-    def make_move(self, from_square, to_square):
+    def check_game_over(self):
         if self.moves_made >= self.max_moves:
+            self.game_over = True
+            if self.white_score > self.black_score:
+                self.winner = "White"
+            elif self.black_score > self.white_score:
+                self.winner = "Black"
+            else:
+                self.winner = "Draw"
+            return True
+        return False
+    
+    def make_move(self, from_square, to_square):
+        if self.game_over or self.moves_made >= self.max_moves:
             return False
         
         move = chess.Move(from_square, to_square)
-        if move in self.board.legal_moves and self.board.is_capture(move):
-            # Get the captured piece
-            captured_piece = self.board.piece_at(to_square)
-            if captured_piece:
-                piece_value = PIECE_VALUES.get(captured_piece.symbol().lower(), 0)
-                if self.board.turn:  # White's turn
-                    self.white_score += piece_value
-                else:
-                    self.black_score += piece_value
-                self.last_capture = (captured_piece.symbol(), piece_value)
+        if move in self.board.legal_moves:
+            # Check if it's a capture move
+            if self.board.is_capture(move):
+                captured_piece = self.board.piece_at(to_square)
+                if captured_piece:
+                    piece_value = PIECE_VALUES.get(captured_piece.symbol().lower(), 0)
+                    if self.board.turn:  # White's turn
+                        self.white_score += piece_value
+                        print(f"White captured {captured_piece.symbol()} worth {piece_value} points!")
+                    else:
+                        self.black_score += piece_value
+                        print(f"Black captured {captured_piece.symbol()} worth {piece_value} points!")
+                    self.last_capture = (captured_piece.symbol(), piece_value)
             
             self.board.push(move)
             self.moves_made += 1
             self.analyze_position()
+            self.check_game_over()
             return True
         return False
     
@@ -162,13 +185,16 @@ def draw_piece(surface, piece, x, y):
     if not piece:
         return
     
-    color = (255, 255, 255) if piece.startswith('white') else (0, 0, 0)
+    color = SILVER if piece.startswith('white') else DARK_BLUE
     piece_type = piece.split('_')[1]
     
-    pygame.draw.circle(surface, color, (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), SQUARE_SIZE//3)
+    # Draw a larger circle for the piece
+    radius = int(SQUARE_SIZE * 0.4)  # Increased size
+    pygame.draw.circle(surface, color, (x + SQUARE_SIZE//2, y + SQUARE_SIZE//2), radius)
     
-    font = pygame.font.SysFont('Arial', SQUARE_SIZE//2)
-    text = font.render(piece_type.upper(), True, (255, 255, 255) if color == (0, 0, 0) else (0, 0, 0))
+    # Draw piece letter with larger font
+    font = pygame.font.SysFont('Arial Bold', int(SQUARE_SIZE * 0.6))  # Larger font
+    text = font.render(piece_type.upper(), True, WHITE if color == DARK_BLUE else BLACK)
     text_rect = text.get_rect(center=(x + SQUARE_SIZE//2, y + SQUARE_SIZE//2))
     surface.blit(text, text_rect)
 
@@ -188,7 +214,20 @@ def main():
     input_text = ""
     input_active = False
     
+    # Create fonts
+    title_font = pygame.font.SysFont('Arial Bold', 32)
+    info_font = pygame.font.SysFont('Arial', 28)
+    score_font = pygame.font.SysFont('Arial Bold', 36)
+    coord_font = pygame.font.SysFont('Arial', 20)  # Added coordinate font
+    
     print("Game started. Window size:", WINDOW_SIZE)
+    print("\nScoring System:")
+    print("Pawn: 1 point")
+    print("Knight: 3 points")
+    print("Bishop: 3 points")
+    print("Rook: 5 points")
+    print("Queen: 9 points")
+    print("\nObjective: Score the most points in 12 moves by capturing high-value pieces!")
     
     while True:
         for event in pygame.event.get():
@@ -242,22 +281,24 @@ def main():
         
         screen.fill(WHITE)
         
+        # Draw input box with better styling
         if input_active:
-            box_color = (200, 220, 255)
+            box_color = LIGHT_BLUE
         else:
             box_color = (220, 220, 220)
         
         pygame.draw.rect(screen, box_color, input_box)
-        pygame.draw.rect(screen, (100, 100, 100), input_box, 2)
+        pygame.draw.rect(screen, DARK_BLUE, input_box, 3)  # Thicker border
         
         if input_text:
-            text_surface = input_font.render(input_text, True, (0, 0, 0))
+            text_surface = title_font.render(input_text, True, (0, 0, 0))
         else:
-            text_surface = input_font.render(input_placeholder, True, (150, 150, 150))
+            text_surface = info_font.render(input_placeholder, True, (150, 150, 150))
         
         text_y = input_box.y + (input_box.height - text_surface.get_height()) // 2
-        screen.blit(text_surface, (input_box.x + 5, text_y))
+        screen.blit(text_surface, (input_box.x + 10, text_y))
         
+        # Draw the board with improved visuals
         for rank in range(BOARD_SIZE):
             for file in range(BOARD_SIZE):
                 square = coords_to_square(file, rank)
@@ -269,6 +310,15 @@ def main():
                     SQUARE_SIZE
                 )
                 pygame.draw.rect(screen, color, rect)
+                
+                # Draw coordinates
+                if rank == 7:  # Draw file letters
+                    coord_font = pygame.font.SysFont('Arial', 20)
+                    file_text = coord_font.render(chr(file + 97), True, BLACK if color == WHITE else WHITE)
+                    screen.blit(file_text, (file * SQUARE_SIZE + 5, rank * SQUARE_SIZE + INPUT_BOX_HEIGHT + SQUARE_SIZE - 25))
+                if file == 0:  # Draw rank numbers
+                    rank_text = coord_font.render(str(8 - rank), True, BLACK if color == WHITE else WHITE)
+                    screen.blit(rank_text, (5, rank * SQUARE_SIZE + INPUT_BOX_HEIGHT + 5))
                 
                 if selected_square == square:
                     s = pygame.Surface((SQUARE_SIZE, SQUARE_SIZE), pygame.SRCALPHA)
@@ -292,29 +342,47 @@ def main():
                 if piece:
                     draw_piece(screen, piece, file * SQUARE_SIZE, rank * SQUARE_SIZE + INPUT_BOX_HEIGHT)
         
-        # Draw game info
-        info_font = pygame.font.SysFont('Arial', 24)
-        turn_text = "Current turn: White" if board.board.turn else "Current turn: Black"
-        moves_text = f"Moves made: {board.moves_made}/{board.max_moves}"
-        white_score_text = f"White score: {board.white_score}"
-        black_score_text = f"Black score: {board.black_score}"
+        # Draw game info with improved styling
+        if not board.game_over:
+            turn_text = "Current Turn: White" if board.board.turn else "Current Turn: Black"
+            moves_text = f"Moves: {board.moves_made}/{board.max_moves}"
+        else:
+            if board.winner == "Draw":
+                turn_text = "Game Over - It's a Draw!"
+            else:
+                turn_text = f"Game Over - {board.winner} Wins!"
+            moves_text = "Final Score"
+        
+        white_score_text = f"White: {board.white_score} points"
+        black_score_text = f"Black: {board.black_score} points"
         
         if board.last_capture:
-            last_capture_text = f"Last capture: {board.last_capture[0]} ({board.last_capture[1]} points)"
+            last_capture_text = f"Last Capture: {board.last_capture[0]} (+{board.last_capture[1]} pts)"
         else:
             last_capture_text = "No captures yet"
         
-        turn_surface = info_font.render(turn_text, True, (0, 0, 0))
-        moves_surface = info_font.render(moves_text, True, (0, 0, 0))
-        white_score_surface = info_font.render(white_score_text, True, (0, 0, 0))
-        black_score_surface = info_font.render(black_score_text, True, (0, 0, 0))
-        last_capture_surface = info_font.render(last_capture_text, True, (0, 0, 0))
+        if not board.game_over:
+            remaining_text = f"Remaining: {board.max_moves - board.moves_made} moves"
+        else:
+            remaining_text = "Game Over!"
         
-        screen.blit(turn_surface, (10, WINDOW_SIZE + INPUT_BOX_HEIGHT + 10))
-        screen.blit(moves_surface, (10, WINDOW_SIZE + INPUT_BOX_HEIGHT + 35))
-        screen.blit(white_score_surface, (10, WINDOW_SIZE + INPUT_BOX_HEIGHT + 60))
-        screen.blit(black_score_surface, (10, WINDOW_SIZE + INPUT_BOX_HEIGHT + 85))
-        screen.blit(last_capture_surface, (10, WINDOW_SIZE + INPUT_BOX_HEIGHT + 110))
+        # Draw info with new fonts and colors
+        y_offset = WINDOW_SIZE + INPUT_BOX_HEIGHT + 20
+        
+        turn_surface = title_font.render(turn_text, True, DARK_BLUE)
+        moves_surface = info_font.render(moves_text, True, (0, 0, 0))
+        white_score_surface = score_font.render(white_score_text, True, DARK_BLUE)
+        black_score_surface = score_font.render(black_score_text, True, DARK_BLUE)
+        last_capture_surface = info_font.render(last_capture_text, True, (0, 0, 0))
+        remaining_surface = title_font.render(remaining_text, True, DARK_BLUE)
+        
+        # Draw info with better spacing
+        screen.blit(turn_surface, (20, y_offset))
+        screen.blit(moves_surface, (20, y_offset + 40))
+        screen.blit(white_score_surface, (20, y_offset + 80))
+        screen.blit(black_score_surface, (20, y_offset + 120))
+        screen.blit(remaining_surface, (WINDOW_SIZE//2 + 20, y_offset))
+        screen.blit(last_capture_surface, (WINDOW_SIZE//2 + 20, y_offset + 80))
         
         pygame.display.flip()
         clock.tick(60)
