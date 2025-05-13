@@ -1,0 +1,17 @@
+2025-05-11 00:42:27,453 - INFO - Starting chess game
+2025-05-11 00:42:27,593 - INFO - Stockfish engine initialized successfully
+2025-05-11 00:42:27,617 - INFO - ChessBoard initialized successfully
+2025-05-11 00:42:27,617 - INFO - Game started. Window size: 1512x982
+2025-05-11 00:42:27,618 - INFO - Initializing game components...
+2025-05-11 00:42:53,947 - ERROR - Error closing chess engine: engine event loop dead
+2025-05-11 00:42:53,949 - ERROR - Traceback (most recent call last):
+  File "/Applications/chessanalyze/chess_game.py", line 478, in __del__
+    elif sys.platform == 'win32':  # Windows
+  File "/Applications/chessanalyze/venv/lib/python3.9/site-packages/chess/engine.py", line 3011, in quit
+    with self._not_shut_down():
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 117, in __enter__
+    return next(self.gen)
+  File "/Applications/chessanalyze/venv/lib/python3.9/site-packages/chess/engine.py", line 2931, in _not_shut_down
+    raise EngineTerminatedError("engine event loop dead")
+chess.engine.EngineTerminatedError: engine event loop dead
+
